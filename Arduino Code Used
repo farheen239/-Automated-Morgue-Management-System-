@@ -1,0 +1,32 @@
+// -------- Automated AI Data Node --------
+// Sends live sensor data to PC for AI processing
+
+#define SENSOR1 A0    // example: corrosion / gas / moisture
+#define SENSOR2 A1    // example: temperature / vibration
+#define LED 9
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(SENSOR1, INPUT);
+  pinMode(SENSOR2, INPUT);
+  pinMode(LED, OUTPUT);
+
+  Serial.println("AI_DATA_NODE_READY");
+}
+
+void loop() {
+  int s1 = analogRead(SENSOR1);
+  int s2 = analogRead(SENSOR2);
+
+  // Simple local alert
+  if (s1 > 600) digitalWrite(LED, HIGH);
+  else digitalWrite(LED, LOW);
+
+  // Send structured data
+  Serial.print("S1:");
+  Serial.print(s1);
+  Serial.print(",S2:");
+  Serial.println(s2);
+
+  delay(1000);
+}
