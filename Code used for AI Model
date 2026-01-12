@@ -1,0 +1,87 @@
+import serial, time, csv, os
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
+
+PORT = "COM3"     # change this
+BAUD = 9600
+DATA_FILE = "live_dataset.csv"
+MODEL_FILE = "auto_ai_model.pkl"
+
+# -------- SERIAL SETUP --------
+arduino = serial.Serial(PORT, BAUD, timeout=1)
+time.sleep(2)
+
+print("✅ Automated AI Model Management System Started")
+
+# -------- CREATE DATA FILE --------
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["sensor1", "sensor2", "label"])
+
+# -------- LOAD OR CREATE MODEL --------
+if os.path.exists(MODEL_FILE):
+    model = joblib.load(MODEL_FILE)
+    print("🔁 Existing AI model loaded")
+else:
+    model = LogisticRegression()
+    print("🆕 New AI model created")
+
+buffer_X = []
+buffer_y = []
+
+# -------- TRAIN FUNCTION --------
+def train_model():
+    data = np.loadtxt(DATA_FILE, delimiter=",", skiprows=1)
+    if len(data) < 10:
+        print("⏳ Not enough data to train")
+        return
+
+    X = data[:, :2]
+    y = data[:, 2]
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+    model.fit(X_train, y_train)
+    joblib.dump(model, MODEL_FILE)
+
+    preds = model.predict(X_test)
+    acc = accuracy_score(y_test, preds)
+
+    print("🤖 Model retrained | Accuracy:", round(acc*100,2), "%")
+
+# -------- MAIN LOOP --------
+while True:
+    line = arduino.readline().decode().strip()
+
+    if line.startswith("S1"):
+        try:
+            parts = line.replace("S1:","").replace("S2:","").split(",")
+            s1 = int(parts[0])
+            s2 = int(parts[1])
+
+            # Auto labeling logic (can be replaced by human input)
+            label = 1 if s1 > 600 else 0
+
+            print(f"Live Data -> S1:{s1} S2:{s2} | Predicted Risk:", label)
+
+            # Save data
+            with open(DATA_FILE, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([s1, s2, label])
+
+            buffer_X.append([s1, s2])
+            buffer_y.append(label)
+
+            # Auto retrain after every 20 samples
+            if len(buffer_X) >= 20:
+                print("🔄 Retraining AI model...")
+                train_model()
+                buffer_X.clear()
+                buffer_y.clear()
+
+        except:
+            pass
